@@ -4,7 +4,7 @@ main: corrupt.deathStashes.DeathStashes
 api-version: '1.20'
 prefix: [ Death-Stashes ]
 authors: [ WCorrupt ]
-description: A system to have a player head drop with all player loot on death
+description: A system to have a player head drop with all player loot on death.
 commands:
   expirestash:
     description: Expires the death stash in your hand.
