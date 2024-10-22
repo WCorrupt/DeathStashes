@@ -32,7 +32,7 @@ public class DeathStashes extends JavaPlugin implements Listener {
             getLogger().info("Saving death stash for " + player.getName());
             String uniqueId = getUniqueIdFromItem(player.getInventory().getItemInMainHand());
             if (uniqueId != null && deathsConfig.contains("deaths." + uniqueId)) {
-                List<ItemStack> items = Arrays.asList(inventory.getContents()).stream().filter(Objects::nonNull).collect(Collectors.toList());
+                List<ItemStack> items = Arrays.stream(inventory.getContents()).filter(Objects::nonNull).collect(Collectors.toList());
                 deathsConfig.set("deaths." + uniqueId + ".items", items);
                 saveDeathsConfig();
                 getLogger().info("Death stash saved for unique ID: " + uniqueId);
@@ -70,11 +70,15 @@ public class DeathStashes extends JavaPlugin implements Listener {
     public void onEnable() {
         deathsFile = new File(getDataFolder(), "deaths.yml");
         if (!deathsFile.exists()) {
-            deathsFile.getParentFile().mkdirs();
+            if (!deathsFile.getParentFile().mkdirs()) {
+                getLogger().warning("Failed to create parent directories for deaths.yml");
+            }
             try {
-                deathsFile.createNewFile();
+                if (!deathsFile.createNewFile()) {
+                    getLogger().warning("Failed to create deaths.yml");
+                }
             } catch (IOException e) {
-                e.printStackTrace();
+                getLogger().severe("An error occurred: " + e.getMessage());
             }
         }
         deathsConfig = YamlConfiguration.loadConfiguration(deathsFile);
@@ -93,7 +97,7 @@ public class DeathStashes extends JavaPlugin implements Listener {
                 return true;
             }
             ItemStack itemInHand = player.getInventory().getItemInMainHand();
-            if (itemInHand == null || itemInHand.getType() != Material.PLAYER_HEAD) {
+            if (itemInHand.getType() == Material.AIR || itemInHand.getType() != Material.PLAYER_HEAD) {
                 player.sendMessage("You must be holding a death stash to use this command.");
                 return true;
             }
@@ -109,8 +113,6 @@ public class DeathStashes extends JavaPlugin implements Listener {
             player.sendMessage("The death stash has been expired.");
             return true;
         });
-
-        Bukkit.getPluginManager().registerEvents(this, this);
 
         new BukkitRunnable() {
             @Override
@@ -137,7 +139,12 @@ public class DeathStashes extends JavaPlugin implements Listener {
         ItemMeta meta = playerHead.getItemMeta();
         if (meta != null) {
             meta.setDisplayName("§rDeath Stash of " + deceased.getName());
-            meta.setLore(Arrays.asList("§r§4🗡 Killed by " + killerName, "", "§r§7Expires on: " + getExpiryDateGMT()));
+            meta.setLore(Arrays.asList(
+                    "§r⚔️ Killed by §e" + killerName + " 😈👿",
+                    "§r§b📦 5 opens left 🤔😎",
+                    "§r",
+                    "§6⏳ Expires on: " + getExpiryDateGMT() + " GMT"
+            ));
 
             NamespacedKey key = new NamespacedKey(this, "deathstash");
             meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, uniqueId);
@@ -204,7 +211,7 @@ public class DeathStashes extends JavaPlugin implements Listener {
         deathsConfig.set(path + ".time", System.currentTimeMillis() + 24 * 60 * 60 * 1000);
 
         List<ItemStack> items = new ArrayList<>();
-        items.addAll(Arrays.asList(player.getInventory().getContents()));
+        items.addAll(List.of(player.getInventory().getContents()));
 
         deathsConfig.set(path + ".items", items.stream().filter(Objects::nonNull).collect(Collectors.toList()));
         saveDeathsConfig();
@@ -219,7 +226,7 @@ public class DeathStashes extends JavaPlugin implements Listener {
             return null;
         }
 
-        Inventory inventory = Bukkit.createInventory(null, 36, "Death Stash");
+        Inventory inventory = Bukkit.createInventory(null, 45, "Death Stash");
         getLogger().info("Created inventory for unique ID: " + uniqueId);
         for (int i = 0; i < items.size() && i < 36; i++) {
             inventory.setItem(i, items.get(i));
@@ -230,7 +237,7 @@ public class DeathStashes extends JavaPlugin implements Listener {
 
     private void loadAllDeathStashes() {
         if (deathsConfig.getConfigurationSection("deaths") != null) {
-            Set<String> loadKeys = deathsConfig.getConfigurationSection("deaths").getKeys(false);
+            Set<String> loadKeys = Optional.ofNullable(deathsConfig.getConfigurationSection("deaths")).map(section -> section.getKeys(false)).orElse(Collections.emptySet());
             for (String loadKey : loadKeys) {
                 getLogger().info("Loading death stash for unique ID: " + loadKey);
                 Inventory deathInventory = loadDeathInventory(loadKey);
